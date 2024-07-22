@@ -23,7 +23,7 @@ export const createUser = async (username, password) => {
                 password: password
             }
         }
-        return await axios.post(`${baseUrl}/users`, {}, options);
+        return await axios.post(`${baseUrl}/users`, {withCredentials: true}, options);
     } catch (e) {
         console.log(e);
     }
