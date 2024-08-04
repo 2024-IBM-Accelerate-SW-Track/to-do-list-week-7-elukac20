@@ -9,6 +9,14 @@ const todoDBName = "tododb";
 const useCloudant = true;
 
 
+const basicAuth = require("express-basic-auth");
+var { authenticator, upsertUser, cookieAuth } = require("./authentication");
+const auth = basicAuth({
+    authorizer: authenticator
+});
+const cookieParser = require("cookie-parser");
+app.use(cookieParser("82e4e438a0705fabf61f9854e3b575af"));
+
 
 //Init code for Cloudant
 const {CloudantV1} = require('@ibm-cloud/cloudant');
@@ -18,7 +26,14 @@ if (useCloudant)
 }
 
 
-app.use(cors());
+
+
+
+
+app.use(cors({
+  credentials: true,
+    origin: 'http://localhost:3000'
+}));
 app.use(bodyParser.json({ extended: true }));
 
 app.listen(port, () => console.log("Backend server live on " + port));
@@ -29,8 +44,29 @@ app.get("/", (request, response) => {
     response.send({ message: "Connected to Backend server!" });
 });
 
+
+app.get("/authenticate", auth, (req, res) => {
+  console.log(`user logging in: ${req.auth.user}`);
+  res.cookie('user', req.auth.user, { signed: true });
+  res.sendStatus(200);
+});
+
+app.post("/users", (req, res) => {
+  const b64auth = (req.headers.authorization || '').split(' ')[1] || ''
+  const [username, password] = Buffer.from(b64auth, 'base64').toString().split(':')
+  const upsertSucceeded = upsertUser(username, password)
+  res.sendStatus(upsertSucceeded ? 200 : 401);
+});
+
+app.get("/logout", (req, res) => {
+  res.clearCookie('user');
+  res.end();
+});
+
+
+
 //add new item to json file
-app.post("/add/item", addItem)
+app.post("/add/item", cookieAuth, addItem)
 
 async function addItem (request, response) {
     try {
@@ -83,7 +119,7 @@ async function addItem (request, response) {
 }
 
 //** week 6, get all items from the json database*/
-app.get("/get/items", getItems)
+app.get("/get/items", cookieAuth, getItems)
 async function getItems (request, response) {
     //begin here
 
@@ -109,23 +145,30 @@ async function getItems (request, response) {
 };
 
 //** week 6, search items service */
-app.get("/get/searchitem", searchItems) 
+app.get("/items/search", cookieAuth, searchItems) 
 async function searchItems (request, response) {
     //begin here
     var searchField = request.query.taskname;
-
+    console.log(searchField)
     if (useCloudant){
+        //console.log('test')
         const client = CloudantV1.newInstance({});
         var search_results
+        //console.log('test2')
+        console.log(searchField)
+
         await client.postSearch({
             db: todoDBName,
             ddoc: 'newdesign',
             query: 'task:'+searchField,
             index: 'newSearch'
           }).then(response => {
+            console.log(response)
             search_results=response.result;
             console.log(response.result);
           });
+        //console.log('test3')
+
         console.log(search_results);
         response.json(JSON.stringify(search_results));
         
@@ -145,6 +188,7 @@ async function initDB ()
     //See example at https://www.npmjs.com/package/@ibm-cloud/cloudant#authentication-with-environment-variables for how to create db
     
     try {
+        const todoDBName = "tododb";
         const client = CloudantV1.newInstance({});
         const putDatabaseResult = (
         await client.putDatabase({
@@ -162,3 +206,4 @@ async function initDB ()
 
   }
 };
+
