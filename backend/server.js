@@ -145,23 +145,30 @@ async function getItems (request, response) {
 };
 
 //** week 6, search items service */
-app.get("/get/searchitem", cookieAuth searchItems) 
+app.get("/items/search", cookieAuth, searchItems) 
 async function searchItems (request, response) {
     //begin here
     var searchField = request.query.taskname;
-
+    console.log(searchField)
     if (useCloudant){
+        //console.log('test')
         const client = CloudantV1.newInstance({});
         var search_results
+        //console.log('test2')
+        console.log(searchField)
+
         await client.postSearch({
             db: todoDBName,
             ddoc: 'newdesign',
             query: 'task:'+searchField,
             index: 'newSearch'
           }).then(response => {
+            console.log(response)
             search_results=response.result;
             console.log(response.result);
           });
+        //console.log('test3')
+
         console.log(search_results);
         response.json(JSON.stringify(search_results));
         
@@ -181,6 +188,7 @@ async function initDB ()
     //See example at https://www.npmjs.com/package/@ibm-cloud/cloudant#authentication-with-environment-variables for how to create db
     
     try {
+        const todoDBName = "tododb";
         const client = CloudantV1.newInstance({});
         const putDatabaseResult = (
         await client.putDatabase({
